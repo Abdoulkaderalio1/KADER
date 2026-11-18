@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Public matrimonial profile visible to authenticated members without PII.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "age": { "type": "integer" },
+        "gender": { "type": "string", "enum": ["homme", "femme"] },
+        "city": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "country": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "latApprox": { "type": "number" },
+        "lngApprox": { "type": "number" },
+        "profession": { "type": "string", "maxLength": 80 },
+        "education": { "type": "string", "maxLength": 80 },
+        "practiceLevel": { "type": "string", "enum": ["pratiquant", "regulier", "en_apprentissage"] },
+        "nikahTimeline": { "type": "string", "enum": ["immediat", "6_12_mois", "connaissance_serieuse"] },
+        "bio": { "type": "string", "maxLength": 600 },
+        "photoUrl": { "type": "string", "maxLength": 120000 },
+        "faceVerified": { "type": "boolean" },
+        "photoVerified": { "type": "boolean" },
+        "verificationScore": { "type": "number" },
+        "ecdhX": { "type": "string", "maxLength": 256 },
+        "ecdhY": { "type": "string", "maxLength": 256 },
+        "sharePrivacy": { "type": "string", "enum": ["membres", "verifies_uniquement"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid", "displayName", "age", "gender", "city", "country",
+        "latApprox", "lngApprox", "profession", "practiceLevel",
+        "nikahTimeline", "bio", "faceVerified", "photoVerified",
+        "sharePrivacy", "createdAt", "updatedAt"
+      ]
+    },
+    "PrivateUserData": {
+      "title": "PrivateUserData",
+      "description": "Owner-only PII, exact geolocation, theme preferences, and pass status.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "maxLength": 160 },
+        "exactLat": { "type": "number" },
+        "exactLng": { "type": "number" },
+        "pushEnabled": { "type": "boolean" },
+        "darkMode": { "type": "boolean" },
+        "darkPalette": { "type": "string", "enum": ["emerald_night", "obsidian_gold", "midnight_slate"] },
+        "accentTone": { "type": "string", "enum": ["emerald", "gold", "sapphire"] },
+        "passActive": { "type": "boolean" },
+        "passPlan": { "type": "string", "enum": ["none", "pass_mensuel", "pass_serenite"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "pushEnabled", "darkMode", "darkPalette", "accentTone", "passActive", "passPlan", "createdAt", "updatedAt"]
+    },
+    "ContactUnlock": {
+      "title": "ContactUnlock",
+      "description": "Paid contact authorization record preventing spam.",
+      "type": "object",
+      "properties": {
+        "payerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "targetUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "plan": { "type": "string", "enum": ["contact_unique", "pass_mensuel", "pass_serenite"] },
+        "amountFcfa": { "type": "integer" },
+        "paymentMethod": { "type": "string", "enum": ["Wave", "Orange Money", "Moov Money", "Carte Bancaire"] },
+        "reference": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["paid"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["payerUid", "targetUid", "plan", "amountFcfa", "paymentMethod", "reference", "status", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Encrypted 1-to-1 conversation metadata between two verified members.",
+      "type": "object",
+      "properties": {
+        "participantA": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participantB": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participants": { "type": "array" },
+        "lastEncryptedHint": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participantA", "participantB", "participants", "createdAt", "updatedAt"]
+    },
+    "EncryptedMessage": {
+      "title": "EncryptedMessage",
+      "description": "End-to-end encrypted AES-GCM message payload inside a conversation.",
+      "type": "object",
+      "properties": {
+        "senderUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "participants": { "type": "array" },
+        "ciphertext": { "type": "string", "minLength": 4, "maxLength": 8000 },
+        "iv": { "type": "string", "minLength": 8, "maxLength": 64 },
+        "senderKeyX": { "type": "string", "maxLength": 256 },
+        "senderKeyY": { "type": "string", "maxLength": 256 },
+        "e2eeAlg": { "type": "string", "enum": ["ECDH-P256-AES-GCM-256"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderUid", "recipientUid", "participants", "ciphertext", "iv", "e2eeAlg", "createdAt"]
+    },
+    "MemberReview": {
+      "title": "MemberReview",
+      "description": "Trust and conduct rating submitted by a member for another member.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "targetUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "rating": { "type": "integer" },
+        "sincerityScore": { "type": "integer" },
+        "respectScore": { "type": "integer" },
+        "comment": { "type": "string", "minLength": 5, "maxLength": 400 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "targetUid", "rating", "sincerityScore", "respectScore", "comment", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": {
+      "schema": { "$ref": "#/entities/PublicProfile" },
+      "description": "Public matrimonial profiles without PII."
+    },
+    "/users_private/{userId}": {
+      "schema": { "$ref": "#/entities/PrivateUserData" },
+      "description": "Private user PII, exact coordinates, and preferences."
+    },
+    "/unlocks/{unlockId}": {
+      "schema": { "$ref": "#/entities/ContactUnlock" },
+      "description": "Paid anti-spam contact unlock records."
+    },
+    "/conversations/{convId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Encrypted conversation headers."
+    },
+    "/conversations/{convId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/EncryptedMessage" },
+      "description": "End-to-end encrypted messages."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/MemberReview" },
+      "description": "Community trust ratings and reviews."
+    }
+  }
+}

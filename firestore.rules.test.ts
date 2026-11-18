@@ -1,0 +1,100 @@
+/**
+ * Security Rule Verification Specification for Le Chemin pour le Nikah
+ * Maps the 12 "Dirty Dozen" adversarial payloads to expected PERMISSION_DENIED outcomes.
+ */
+
+export const dirtyDozenPayloads = [
+  {
+    name: '1. Usurpation de profil',
+    path: '/profiles/victim_uid',
+    operation: 'create',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    payload: { uid: 'victim_uid', displayName: 'Imposteur' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '2. Champ fantome (Shadow Field)',
+    path: '/profiles/attacker_uid',
+    operation: 'create',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    payload: { uid: 'attacker_uid', isAdmin: true },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '3. Email non verifie',
+    path: '/profiles/user_uid',
+    operation: 'create',
+    auth: { uid: 'user_uid', token: { email_verified: false } },
+    payload: { uid: 'user_uid', displayName: 'Test' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '4. Fuite PII (users_private)',
+    path: '/users_private/victim_uid',
+    operation: 'get',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '5. Poison ID',
+    path: '/profiles/invalid$id_too_long_' + 'x'.repeat(150),
+    operation: 'create',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '6. Falsification de note',
+    path: '/reviews/rev_1',
+    operation: 'create',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    payload: { authorUid: 'attacker_uid', targetUid: 'victim_uid', rating: 99 },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '7. Auto-notation',
+    path: '/reviews/rev_2',
+    operation: 'create',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    payload: { authorUid: 'attacker_uid', targetUid: 'attacker_uid', rating: 5 },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '8. Lecture non autorisee de messages',
+    path: '/conversations/conv_a_b/messages/msg_1',
+    operation: 'get',
+    auth: { uid: 'outsider_uid', token: { email_verified: true } },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '9. Modification message chiffre',
+    path: '/conversations/conv_a_b/messages/msg_1',
+    operation: 'update',
+    auth: { uid: 'user_a', token: { email_verified: true } },
+    payload: { ciphertext: 'tampered' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '10. Falsification de paiement',
+    path: '/unlocks/unl_1',
+    operation: 'create',
+    auth: { uid: 'attacker_uid', token: { email_verified: true } },
+    payload: { payerUid: 'victim_uid', targetUid: 'target_uid', amountFcfa: 2500 },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '11. Modification createdAt immutable',
+    path: '/profiles/user_a',
+    operation: 'update',
+    auth: { uid: 'user_a', token: { email_verified: true } },
+    payload: { createdAt: 'tampered_timestamp' },
+    expected: 'PERMISSION_DENIED',
+  },
+  {
+    name: '12. Depassement de volume (Denial of Wallet)',
+    path: '/profiles/user_a',
+    operation: 'update',
+    auth: { uid: 'user_a', token: { email_verified: true } },
+    payload: { bio: 'A'.repeat(2000) },
+    expected: 'PERMISSION_DENIED',
+  },
+];

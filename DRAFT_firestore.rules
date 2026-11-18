@@ -1,0 +1,297 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Hardened Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Validation Blueprints ---
+    function isValidPublicProfile(data, userId) {
+      return data.keys().hasAll([
+        'uid', 'displayName', 'age', 'gender', 'city', 'country',
+        'latApprox', 'lngApprox', 'profession', 'practiceLevel',
+        'nikahTimeline', 'bio', 'faceVerified', 'photoVerified',
+        'sharePrivacy', 'createdAt', 'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'uid', 'displayName', 'age', 'gender', 'city', 'country',
+        'latApprox', 'lngApprox', 'profession', 'education', 'practiceLevel',
+        'nikahTimeline', 'bio', 'photoUrl', 'faceVerified', 'photoVerified',
+        'verificationScore', 'ecdhX', 'ecdhY', 'sharePrivacy', 'createdAt', 'updatedAt'
+      ])
+      && data.uid == userId
+      && isValidId(data.uid)
+      && data.displayName is string && data.displayName.size() >= 2 && data.displayName.size() <= 60
+      && data.age is int && data.age >= 18 && data.age <= 99
+      && data.gender in ['homme', 'femme']
+      && data.city is string && data.city.size() >= 2 && data.city.size() <= 80
+      && data.country is string && data.country.size() >= 2 && data.country.size() <= 80
+      && data.latApprox is number && data.latApprox >= -90 && data.latApprox <= 90
+      && data.lngApprox is number && data.lngApprox >= -180 && data.lngApprox <= 180
+      && data.profession is string && data.profession.size() >= 1 && data.profession.size() <= 80
+      && (!('education' in data) || (data.education is string && data.education.size() <= 80))
+      && data.practiceLevel in ['pratiquant', 'regulier', 'en_apprentissage']
+      && data.nikahTimeline in ['immediat', '6_12_mois', 'connaissance_serieuse']
+      && data.bio is string && data.bio.size() <= 600
+      && (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 120000))
+      && data.faceVerified is bool
+      && data.photoVerified is bool
+      && (!('verificationScore' in data) || (data.verificationScore is number && data.verificationScore >= 0 && data.verificationScore <= 100))
+      && (!('ecdhX' in data) || (data.ecdhX is string && data.ecdhX.size() <= 256))
+      && (!('ecdhY' in data) || (data.ecdhY is string && data.ecdhY.size() <= 256))
+      && data.sharePrivacy in ['membres', 'verifies_uniquement']
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateUserData(data, userId) {
+      return data.keys().hasAll([
+        'uid', 'email', 'pushEnabled', 'darkMode', 'darkPalette',
+        'accentTone', 'passActive', 'passPlan', 'createdAt', 'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'uid', 'email', 'exactLat', 'exactLng', 'pushEnabled', 'darkMode',
+        'darkPalette', 'accentTone', 'passActive', 'passPlan', 'createdAt', 'updatedAt'
+      ])
+      && data.uid == userId
+      && isValidId(data.uid)
+      && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+      && (!('exactLat' in data) || (data.exactLat is number && data.exactLat >= -90 && data.exactLat <= 90))
+      && (!('exactLng' in data) || (data.exactLng is number && data.exactLng >= -180 && data.exactLng <= 180))
+      && data.pushEnabled is bool
+      && data.darkMode is bool
+      && data.darkPalette in ['emerald_night', 'obsidian_gold', 'midnight_slate']
+      && data.accentTone in ['emerald', 'gold', 'sapphire']
+      && data.passActive is bool
+      && data.passPlan in ['none', 'pass_mensuel', 'pass_serenite']
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidContactUnlock(data) {
+      return data.keys().hasAll([
+        'payerUid', 'targetUid', 'plan', 'amountFcfa',
+        'paymentMethod', 'reference', 'status', 'createdAt'
+      ])
+      && data.keys().hasOnly([
+        'payerUid', 'targetUid', 'plan', 'amountFcfa',
+        'paymentMethod', 'reference', 'status', 'createdAt'
+      ])
+      && data.payerUid == request.auth.uid
+      && isValidId(data.payerUid)
+      && isValidId(data.targetUid)
+      && data.payerUid != data.targetUid
+      && data.plan in ['contact_unique', 'pass_mensuel', 'pass_serenite']
+      && data.amountFcfa is int && data.amountFcfa >= 2500 && data.amountFcfa <= 50000
+      && data.paymentMethod in ['Wave', 'Orange Money', 'Moov Money', 'Carte Bancaire']
+      && data.reference is string && data.reference.size() >= 4 && data.reference.size() <= 64
+      && data.status == 'paid'
+      && data.createdAt is timestamp;
+    }
+
+    function isValidConversation(data) {
+      return data.keys().hasAll(['participantA', 'participantB', 'participants', 'createdAt', 'updatedAt'])
+      && data.keys().hasOnly(['participantA', 'participantB', 'participants', 'lastEncryptedHint', 'createdAt', 'updatedAt'])
+      && isValidId(data.participantA)
+      && isValidId(data.participantB)
+      && data.participantA != data.participantB
+      && data.participants is list
+      && data.participants.size() == 2
+      && data.participants[0] is string
+      && data.participants[1] is string
+      && data.participants.hasAll([data.participantA, data.participantB])
+      && request.auth.uid in data.participants
+      && (!('lastEncryptedHint' in data) || (data.lastEncryptedHint is string && data.lastEncryptedHint.size() <= 120))
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidEncryptedMessage(data, convData) {
+      return data.keys().hasAll(['senderUid', 'recipientUid', 'participants', 'ciphertext', 'iv', 'e2eeAlg', 'createdAt'])
+      && data.keys().hasOnly(['senderUid', 'recipientUid', 'participants', 'ciphertext', 'iv', 'senderKeyX', 'senderKeyY', 'e2eeAlg', 'createdAt'])
+      && data.senderUid == request.auth.uid
+      && isValidId(data.senderUid)
+      && isValidId(data.recipientUid)
+      && data.senderUid != data.recipientUid
+      && data.participants is list
+      && data.participants.size() == 2
+      && data.participants[0] is string
+      && data.participants[1] is string
+      && data.participants.hasAll([convData.participantA, convData.participantB])
+      && data.senderUid in convData.participants
+      && data.recipientUid in convData.participants
+      && data.ciphertext is string && data.ciphertext.size() >= 4 && data.ciphertext.size() <= 8000
+      && data.iv is string && data.iv.size() >= 8 && data.iv.size() <= 64
+      && (!('senderKeyX' in data) || (data.senderKeyX is string && data.senderKeyX.size() <= 256))
+      && (!('senderKeyY' in data) || (data.senderKeyY is string && data.senderKeyY.size() <= 256))
+      && data.e2eeAlg == 'ECDH-P256-AES-GCM-256'
+      && data.createdAt is timestamp;
+    }
+
+    function isValidMemberReview(data) {
+      return data.keys().hasAll([
+        'authorUid', 'authorName', 'targetUid', 'rating',
+        'sincerityScore', 'respectScore', 'comment', 'createdAt'
+      ])
+      && data.keys().hasOnly([
+        'authorUid', 'authorName', 'targetUid', 'rating',
+        'sincerityScore', 'respectScore', 'comment', 'createdAt'
+      ])
+      && data.authorUid == request.auth.uid
+      && isValidId(data.authorUid)
+      && isValidId(data.targetUid)
+      && data.authorUid != data.targetUid
+      && data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 60
+      && data.rating is int && data.rating >= 1 && data.rating <= 5
+      && data.sincerityScore is int && data.sincerityScore >= 1 && data.sincerityScore <= 5
+      && data.respectScore is int && data.respectScore >= 1 && data.respectScore <= 5
+      && data.comment is string && data.comment.size() >= 5 && data.comment.size() <= 400
+      && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // Connection health check document
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Public matrimonial profiles (no PII)
+    match /profiles/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && resource.data.uid is string;
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidPublicProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidPublicProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'age', 'gender', 'city', 'country',
+          'latApprox', 'lngApprox', 'profession', 'education', 'practiceLevel',
+          'nikahTimeline', 'bio', 'photoUrl', 'faceVerified', 'photoVerified',
+          'verificationScore', 'ecdhX', 'ecdhY', 'sharePrivacy', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Private PII, exact coordinates, preferences, pass status
+    match /users_private/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidPrivateUserData(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidPrivateUserData(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'exactLat', 'exactLng', 'pushEnabled', 'darkMode',
+          'darkPalette', 'accentTone', 'passActive', 'passPlan', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Paid anti-spam contact unlocks
+    match /unlocks/{unlockId} {
+      allow get: if isSignedIn() && isValidId(unlockId) && existing().payerUid == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.payerUid == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(unlockId)
+        && isValidContactUnlock(incoming())
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // Conversations & Encrypted Messages
+    match /conversations/{convId} {
+      allow get: if isSignedIn() && isValidId(convId) && request.auth.uid in existing().participants;
+      allow list: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isVerifiedUser()
+        && isValidId(convId)
+        && isValidConversation(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(convId)
+        && isValidConversation(incoming())
+        && request.auth.uid in existing().participants
+        && incoming().participantA == existing().participantA
+        && incoming().participantB == existing().participantB
+        && incoming().participants == existing().participants
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['lastEncryptedHint', 'updatedAt']);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn()
+          && isValidId(convId)
+          && isValidId(messageId)
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        allow list: if isSignedIn()
+          && request.auth.uid in resource.data.participants;
+        allow create: if isVerifiedUser()
+          && isValidId(convId)
+          && isValidId(messageId)
+          && exists(/databases/$(database)/documents/conversations/$(convId))
+          && isValidEncryptedMessage(incoming(), get(/databases/$(database)/documents/conversations/$(convId)).data)
+          && incoming().createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // Community Trust Reviews
+    match /reviews/{reviewId} {
+      allow get: if isSignedIn() && isValidId(reviewId);
+      allow list: if isSignedIn() && resource.data.targetUid is string;
+      allow create: if isVerifiedUser()
+        && isValidId(reviewId)
+        && isValidMemberReview(incoming())
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

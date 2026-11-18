@@ -1,0 +1,6 @@
+{
+  "name": "Le Chemin pour le Nikah",
+  "description": "Plateforme de rencontres sérieuses pour le Nikah avec reconnaissance faciale, messagerie instantanée chiffrée de bout en bout, géolocalisation discrète, notation communautaire et mise en contact anti-spam.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
